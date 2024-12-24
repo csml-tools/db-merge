@@ -9,13 +9,16 @@ from sqlalchemy import (
 )
 
 
+def reflect_metadata(source: Engine | Connection) -> MetaData:
+    metadata = MetaData()
+    metadata.reflect(source)
+    return metadata
+
+
 class SmartConnection:
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
-
-        metadata = MetaData()
-        metadata.reflect(connection)
-        self.metadata = metadata
+        self.metadata = reflect_metadata(connection)
 
     @contextmanager
     @staticmethod
