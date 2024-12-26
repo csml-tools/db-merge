@@ -16,13 +16,13 @@ def parse_sliced_url(value: str) -> SlicedUrl:
 
 def main(
     inputs: Annotated[list[SlicedUrl], typer.Argument(parser=parse_sliced_url)],
-    # output: Annotated[str, typer.Option("-o", "--output")],
+    output: Annotated[str, typer.Option("-o", "--output")],
     options: Annotated[
         Optional[MergeOptions],
         typer.Option("-c", "--cfg", click_type=PydanticFileLoader(MergeOptions)),
     ] = None,
 ):
-    smart_merge(inputs, options)
+    smart_merge(inputs, output, options)
 
 
 typer.run(main)

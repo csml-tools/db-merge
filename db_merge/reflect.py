@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from collections import defaultdict
-from typing import Callable
+from typing import Callable, Optional, Sequence
 from sqlalchemy import Engine, Connection, MetaData, Table
 
 from .options import TableIdent
@@ -49,7 +49,7 @@ class MergedGraph:
                         TableIdent.from_table(fk.referred_table)
                     ].add(ident)
 
-    def sort(self) -> list[MergedTable]:
+    def sort(self, constraints: Optional[list[TableIdent]] = None) -> list[MergedTable]:
         stack: list[MergedTable] = []
         visited: set[TableIdent] = set()
 
@@ -62,7 +62,7 @@ class MergedGraph:
 
                 stack.append(self.tables[ident])
 
-        for ident in self.tables:
+        for ident in self.tables if constraints is None else constraints:
             visit(ident)
 
         stack.reverse()

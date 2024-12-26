@@ -18,8 +18,11 @@ class TableIdent(BaseModel, frozen=True):
 class SliceTable(TableIdent, frozen=True):
     slice_column: str
 
+    def ident(self) -> TableIdent:
+        return TableIdent(name=self.name, db_schema=self.db_schema)
+
 
 class MergeOptions(BaseModel):
     exclude: set[TableIdent] = set()
-    same: list[TableIdent] = []
+    same: set[TableIdent] = set()
     sliced: list[SliceTable] = []
