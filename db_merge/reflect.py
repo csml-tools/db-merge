@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict
 from typing import Callable
 from sqlalchemy import Engine, Connection, MetaData, Table
@@ -19,18 +19,15 @@ class TableSource:
     table: Table
 
 
+@dataclass
 class MergedTable:
-    def __init__(self) -> None:
-        self.sources: list[TableSource] = []
-
-    @property
-    def ident(self) -> TableIdent:
-        return TableIdent.from_table(self.sources[0].table)
+    ident: TableIdent
+    sources: list[TableSource] = field(default_factory=list)
 
 
 class MergedGraph:
     def __init__(self) -> None:
-        self.tables: defaultdict[TableIdent, MergedTable] = defaultdict(MergedTable)
+        self.tables: dict[TableIdent, MergedTable] = {}
         self.inverse_relations: defaultdict[TableIdent, set[TableIdent]] = defaultdict(
             set
         )
@@ -42,6 +39,9 @@ class MergedGraph:
             if not include or include(table):
 
                 ident = TableIdent.from_table(table)
+                if ident not in self.tables:
+                    self.tables[ident] = MergedTable(ident)
+
                 self.tables[ident].sources.append(TableSource(connection, table))
 
                 for fk in table.foreign_key_constraints:

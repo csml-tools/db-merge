@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy import create_engine
 
-from .options import MergeOptions, TableIdent
+from .options import MergeOptions
 from .reflect import MergedGraph
 
 
