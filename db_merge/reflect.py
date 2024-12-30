@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from collections import defaultdict
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional
 from sqlalchemy import Engine, Connection, MetaData, Table
 
 from .options import TableIdent

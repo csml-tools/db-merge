@@ -1,7 +1,6 @@
 from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
-from pydantic.json_schema import AnyType
 from sqlalchemy import create_engine, Connection
 from sys import exit
 
@@ -20,7 +19,7 @@ def find_overlaps(graph: MergedGraph, options: MergeOptions) -> list[TableIdent]
     sliced_tree: set[TableIdent] = {
         merged_table.ident
         for merged_table in graph.sort(
-            constraints=[table.ident() for table in options.sliced]
+            constraints=[item.table for item in options.sliced]
         )
     }
 

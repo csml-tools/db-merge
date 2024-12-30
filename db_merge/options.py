@@ -15,11 +15,9 @@ class TableIdent(BaseModel, frozen=True):
         return f"{self.db_schema}.{self.name}" if self.db_schema else self.name
 
 
-class SliceTable(TableIdent, frozen=True):
+class SliceTable(BaseModel):
+    table: TableIdent
     slice_column: str
-
-    def ident(self) -> TableIdent:
-        return TableIdent(name=self.name, db_schema=self.db_schema)
 
 
 class MergeOptions(BaseModel):
