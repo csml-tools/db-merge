@@ -78,9 +78,8 @@ class SlicedTable(MergedTable):
             return (
                 select(target_column)
                 .where(
-                    self._table.c["__dbmerge_old_id"]
-                    == old_value & self._table.c["__dbmerge_slice"]
-                    == bindparam("__dbmerge_slice")
+                    self._table.c["__dbmerge_old_id"] == old_value,
+                    self._table.c["__dbmerge_slice"] == bindparam("__dbmerge_slice"),
                 )
                 .scalar_subquery()
             )
