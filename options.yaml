@@ -1,0 +1,10 @@
+same:
+  - csml_type_record_ids
+  - csml_type_category
+  - csml_type_database_record
+
+sliced:
+  - table: csml_source
+    slice_column: id_slice
+  - table: csml_record
+    slice_column: id_slice
