@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import ExitStack
 from typing import Callable, Concatenate, Iterator, Optional
+import sys
 
 from sqlalchemy import Connection, MetaData, Table, ForeignKey, create_engine, select
 from sqlalchemy.sql.expression import func
@@ -160,6 +161,51 @@ class SliceTable(OutputTable):
                 connection.execute(insert_stmnt, rowdict)
 
 
+def create_merged_metadata(
+    inputs: list[InputSession],
+    options: MergeOptions,
+) -> tuple[list[str], OutputMetadata]:
+    graph = OverlayGraph()
+    for session in inputs:
+        for table in session.metadata.tables.values():
+            if table.key not in options.exclude:
+                graph.add_table_source(TableSource(table, session))
+
+    # Child tables of a slice table are also considered slice tables
+    slice_tables = {
+        group.key for group in graph.sort([item.table for item in options.sliced])
+    }
+
+    slice_column_names = {
+        item.table: item.slice_column
+        for item in options.sliced
+        if item.slice_column is not None
+    }
+
+    out_metadata = OutputMetadata()
+    unclassified = []
+
+    for group in graph.iter_tables():
+        if len(group.sources) == 1:
+            out_metadata.add_table(SingleSourceTable, group.sources[0])
+        elif len(group.sources) > 1:
+            if group.key in options.same:
+                check_same_columns_raise(group)
+                check_same_data_raise(group)
+                out_metadata.add_table(SingleSourceTable, group.sources[0])
+            elif group.key in slice_tables:
+                check_same_columns_raise(group)
+                out_metadata.add_table(
+                    SliceTable,
+                    group.sources,
+                    slice_column=slice_column_names.get(group.key, None),
+                )
+            else:
+                unclassified.append(group.key)
+
+    return unclassified, out_metadata
+
+
 def smart_merge(
     input_urls: list[SliceUrl],
     output_url: str,
@@ -169,49 +215,18 @@ def smart_merge(
 
     with ExitStack() as stack:
         inputs = [stack.enter_context(InputSession.connect(url)) for url in input_urls]
+        unclassified, metadata = create_merged_metadata(inputs, options)
 
-        graph = OverlayGraph()
-        for session in inputs:
-            for table in session.metadata.tables.values():
-                if table.key not in options.exclude:
-                    graph.add_table_source(TableSource(table, session))
-
-        # Child tables of a slice table are also considered slice tables
-        slice_tables = {
-            group.key for group in graph.sort([item.table for item in options.sliced])
-        }
-
-        slice_column_names = {
-            item.table: item.slice_column
-            for item in options.sliced
-            if item.slice_column is not None
-        }
-
-        out_metadata = OutputMetadata()
-        for group in graph.iter_tables():
-            if len(group.sources) == 1:
-                out_metadata.add_table(SingleSourceTable, group.sources[0])
-            elif len(group.sources) > 1:
-                if group.key in options.same:
-                    check_same_columns_raise(group)
-                    check_same_data_raise(group)
-                    out_metadata.add_table(SingleSourceTable, group.sources[0])
-                elif group.key in slice_tables:
-                    check_same_columns_raise(group)
-                    out_metadata.add_table(
-                        SliceTable,
-                        group.sources,
-                        slice_column=slice_column_names.get(group.key, None),
-                    )
-                else:
-                    raise RuntimeError(
-                        f"Couldn't classify overlapping table {group.key}"
-                    )
+        if len(unclassified) > 0:
+            print("Unclassified overlapping tables:")
+            for table_name in unclassified:
+                print(table_name)
+            sys.exit(1)
 
         with create_engine(output_url).connect() as out_connection:
             reflect_metadata(out_connection).drop_all(out_connection)
 
-            for table in out_metadata.sorted_tables():
+            for table in metadata.sorted_tables():
                 print("Creating", table.key)
                 table.create(out_connection)
 
