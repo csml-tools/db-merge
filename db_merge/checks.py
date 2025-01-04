@@ -1,7 +1,8 @@
 from typing import Any, Callable, Optional
 
 from sqlalchemy import Column, Table
-from .source import TableSource
+
+from .session import TableSource, TableSourceGroup
 
 
 def check_same_columns(sources: list[TableSource]) -> bool:
@@ -12,11 +13,6 @@ def check_same_columns(sources: list[TableSource]) -> bool:
                 return False
 
     return True
-
-
-def check_same_columns_raise(name: str, sources: list[TableSource]):
-    if not check_same_columns(sources):
-        raise RuntimeError(f"Overlapping {name} has non-matching columns")
 
 
 type Rowdict = dict[tuple, dict]
@@ -58,10 +54,15 @@ def check_same_data(sources: list[TableSource]):
     return True
 
 
-def check_same_data_raise(name: str, sources: list[TableSource]):
-    if not check_same_data(sources):
+def check_same_columns_raise(group: TableSourceGroup):
+    if not check_same_columns(group.sources):
+        raise RuntimeError(f"Overlapping {group.key} has non-matching columns")
+
+
+def check_same_data_raise(group: TableSourceGroup):
+    if not check_same_data(group.sources):
         raise RuntimeError(
-            f"Overlapping {name} must have the same data across all sources"
+            f"Overlapping {group.key} must have the same data across all sources"
         )
 
 
@@ -70,6 +71,15 @@ def single_primary_key(table: Table) -> Optional[Column[Any]]:
 
     if len(primary_keys) > 0:
         if len(primary_keys) > 1:
-            raise RuntimeError("Multi-column primary keys currently not supported")
+            raise RuntimeError("Multi-column primary keys not currently supported")
 
         return primary_keys[0]
+
+
+__all__ = [
+    "check_same_columns",
+    "check_same_data",
+    "check_same_columns_raise",
+    "check_same_data_raise",
+    "single_primary_key",
+]
