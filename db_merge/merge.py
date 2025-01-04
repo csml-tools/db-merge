@@ -108,20 +108,20 @@ class SingleSourceTable(OutputTable):
 
 
 class SliceTable(OutputTable):
-    def __init__(self, metadata: OutputMetadata, sources: list[TableSource]) -> None:
+    def __init__(
+        self,
+        metadata: OutputMetadata,
+        sources: list[TableSource],
+        slice_column: Optional[str] = None,
+    ) -> None:
         super().__init__(metadata, sources[0].table.to_metadata(metadata.sqlalchemy))
         self._primary_key = single_primary_key(self._table)
+        self._slice_column = slice_column
         self._sources = sorted(sources, key=lambda source: source.slice)
 
     def _insert(self, connection: Connection):
         # Insert without the primary key
-        insert_stmnt = self._table.insert().values(
-            {
-                column.name: None
-                for column in self._table.columns.values()
-                if column is not self._primary_key
-            }
-        )
+        insert_stmnt = self._table.insert()
 
         offsetted_foreign_keys: list[tuple[str, ForeignKey]] = []
         for column in self._table.columns.values():
@@ -134,6 +134,7 @@ class SliceTable(OutputTable):
 
         for source in self._sources:
             if self._primary_key is not None:
+                # Save offsets for later
                 offset = (
                     connection.execute(select(func.max(self._primary_key))).scalar()
                     or 0
@@ -142,9 +143,14 @@ class SliceTable(OutputTable):
 
             for row in source.connection.execute(source.table.select()):
                 rowdict = row._asdict()
+                # Don't include primary key in INSERT
                 if self._primary_key is not None:
                     del rowdict[self._primary_key.name]
 
+                if self._slice_column:
+                    rowdict[self._slice_column] = source.slice
+
+                # Apply offsets
                 for column_name, fk in offsetted_foreign_keys:
                     if rowdict[column_name] is not None:
                         rowdict[column_name] += self._metadata.offsets[
@@ -175,6 +181,12 @@ def smart_merge(
             group.key for group in graph.sort([item.table for item in options.sliced])
         }
 
+        slice_column_names = {
+            item.table: item.slice_column
+            for item in options.sliced
+            if item.slice_column is not None
+        }
+
         out_metadata = OutputMetadata()
         for group in graph.iter_tables():
             if len(group.sources) == 1:
@@ -186,7 +198,11 @@ def smart_merge(
                     out_metadata.add_table(SingleSourceTable, group.sources[0])
                 elif group.key in slice_tables:
                     check_same_columns_raise(group)
-                    out_metadata.add_table(SliceTable, group.sources)
+                    out_metadata.add_table(
+                        SliceTable,
+                        group.sources,
+                        slice_column=slice_column_names.get(group.key, None),
+                    )
                 else:
                     raise RuntimeError(
                         f"Couldn't classify overlapping table {group.key}"
