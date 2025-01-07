@@ -16,7 +16,7 @@ where
 
 - `INPUTS` are one or more [sqlalchemy-style URLs](https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls),
   like `sqlite:///file.sqlite`.  
-  Slices can be manually specified with a `#` prefix: `2#sqlite:///input1.sqlite` `4#sqlite:///input1.sqlite`,  
+  Slices can be manually specified with a `#` prefix: `2#sqlite:///input1.sqlite` `4#sqlite:///input2.sqlite`,  
   or will be assigned automatically, starting from 0
 - `-o OUTPUT` is a [sqlalchemy-style URL](https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls)
 - `-c OPTIONS` is a JSON or YAML configuration file
