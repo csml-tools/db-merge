@@ -1,18 +1,18 @@
-[tool.poetry]
+[project]
 name = "db-merge"
 version = "0.1.0"
 description = ""
-authors = ["Evgenii Rechkalov <snorkysnark@gmail.com>"]
+authors = [{name = "Evgenii Rechkalov", email = "snorkysnark@gmail.com"}]
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.12"
-sqlalchemy = "^2.0.36"
-pytest = "^8.3.4"
-graphviz = "^0.20.3"
-typer = "^0.15.1"
-pydantic = "^2.10.4"
-pyyaml = "^6.0.2"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0.36",
+    "pytest>=8.3.4",
+    "graphviz>=0.20.3",
+    "typer>=0.15.1",
+    "pydantic>=2.10.4",
+    "pyyaml>=6.0.2",
+]
 
 
 [build-system]
