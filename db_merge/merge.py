@@ -23,7 +23,10 @@ from .session import (
     InputSession,
     reflect_metadata,
 )
-from .checks import check_same_columns_raise, check_same_data_raise, single_primary_key
+from .utils import (
+    get_rows_by_primary_key,
+    single_primary_key,
+)
 
 
 class OverlayGraph:
@@ -128,12 +131,39 @@ class MergedTable(OutputTable):
         super().__init__(metadata, table)
         self._sources = sources
 
+
+class ReferenceTable(MergedTable):
+    def __init__(self, metadata: OutputMetadata, sources: list[TableSource]) -> None:
+        super().__init__(metadata, sources)
+
+        sources_iter = iter(sources)
+        data = get_rows_by_primary_key(next(sources_iter))
+
+        for source in sources_iter:
+            rows = get_rows_by_primary_key(source)
+            if rows.keys() != data.keys():
+                raise RuntimeError(
+                    f"Overlapping {self._table.name} must have the same data across all sources: non matching primary keys"
+                )
+
+            for pk, row in rows.items():
+                row_main = data[pk]
+
+                for key, value in row.items():
+                    if key not in row_main:
+                        row_main[key] = value
+                    elif row_main[key] != row[key]:
+                        raise RuntimeError(
+                            f"Overlapping {self._table.name} must have the same data across all sources: error at {pk}"
+                        )
+
+        self._data = data
+
     def _insert(self, connection: Connection):
         insert_stmnt = self._table.insert()
 
-        for source in self._sources:
-            for row in source.connection.execute(source.table.select()):
-                connection.execute(insert_stmnt, row._asdict())
+        for row in self._data.values():
+            connection.execute(insert_stmnt, row)
 
 
 class SliceTable(MergedTable):
@@ -216,9 +246,7 @@ def create_merged_metadata(
             out_metadata.add_table(SingleSourceTable, group.sources[0])
         elif len(group.sources) > 1:
             if group.key in options.same:
-                check_same_columns_raise(group)
-                check_same_data_raise(group)
-                out_metadata.add_table(SingleSourceTable, group.sources[0])
+                out_metadata.add_table(ReferenceTable, group.sources)
             elif group.key in slice_tables:
                 out_metadata.add_table(
                     SliceTable,
