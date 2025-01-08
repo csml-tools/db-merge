@@ -123,7 +123,7 @@ class MergedTable(OutputTable):
         for source in sources_iter:
             for column in source.table.columns.values():
                 if column.name not in table.columns:
-                    table.append_column(column)
+                    table.append_column(column._copy())
 
         super().__init__(metadata, table)
         self._sources = sources
