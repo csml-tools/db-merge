@@ -5,7 +5,14 @@ from contextlib import ExitStack
 from typing import Callable, Concatenate, Iterator, Optional
 import sys
 
-from sqlalchemy import Connection, MetaData, Table, ForeignKey, create_engine, select
+from sqlalchemy import (
+    Connection,
+    MetaData,
+    Table,
+    ForeignKey,
+    create_engine,
+    select,
+)
 from sqlalchemy.sql.expression import func
 
 from .options import MergeOptions
@@ -16,7 +23,7 @@ from .session import (
     InputSession,
     reflect_metadata,
 )
-from .checks import check_same_data_raise, check_same_columns_raise, single_primary_key
+from .checks import check_same_columns_raise, check_same_data_raise, single_primary_key
 
 
 class OverlayGraph:
@@ -108,20 +115,39 @@ class SingleSourceTable(OutputTable):
             connection.execute(insert_stmnt, row._asdict())
 
 
-class SliceTable(OutputTable):
+class MergedTable(OutputTable):
+    def __init__(self, metadata: OutputMetadata, sources: list[TableSource]) -> None:
+        sources_iter = iter(sources)
+        table = next(sources_iter).table.to_metadata(metadata.sqlalchemy)
+
+        for source in sources_iter:
+            for column in source.table.columns.values():
+                if column.name not in table.columns:
+                    table.append_column(column)
+
+        super().__init__(metadata, table)
+        self._sources = sources
+
+    def _insert(self, connection: Connection):
+        insert_stmnt = self._table.insert()
+
+        for source in self._sources:
+            for row in source.connection.execute(source.table.select()):
+                connection.execute(insert_stmnt, row._asdict())
+
+
+class SliceTable(MergedTable):
     def __init__(
         self,
         metadata: OutputMetadata,
         sources: list[TableSource],
         slice_column: Optional[str] = None,
     ) -> None:
-        super().__init__(metadata, sources[0].table.to_metadata(metadata.sqlalchemy))
+        super().__init__(metadata, sources)
         self._primary_key = single_primary_key(self._table)
         self._slice_column = slice_column
-        self._sources = sorted(sources, key=lambda source: source.slice)
 
     def _insert(self, connection: Connection):
-        # Insert without the primary key
         insert_stmnt = self._table.insert()
 
         offsetted_foreign_keys: list[tuple[str, ForeignKey]] = []
@@ -194,7 +220,6 @@ def create_merged_metadata(
                 check_same_data_raise(group)
                 out_metadata.add_table(SingleSourceTable, group.sources[0])
             elif group.key in slice_tables:
-                check_same_columns_raise(group)
                 out_metadata.add_table(
                     SliceTable,
                     group.sources,
@@ -215,6 +240,8 @@ def smart_merge(
 
     with ExitStack() as stack:
         inputs = [stack.enter_context(InputSession.connect(url)) for url in input_urls]
+        inputs.sort(key=lambda input: input.slice)
+
         unclassified, metadata = create_merged_metadata(inputs, options)
 
         if len(unclassified) > 0:
