@@ -2,9 +2,9 @@ import re
 import typer
 from dataclasses import dataclass
 from typing import Annotated, Optional
+from csml_click_types import PydanticFileLoader
 
 from .options import MergeOptions
-from .click_params import PydanticFileLoader
 from .merge import smart_merge
 from .session import SliceUrl
 

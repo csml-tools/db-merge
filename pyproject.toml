@@ -7,11 +7,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "sqlalchemy>=2.0.36",
-    "pytest>=8.3.4",
-    "graphviz>=0.20.3",
     "typer>=0.15.1",
     "pydantic>=2.10.4",
     "pyyaml>=6.0.2",
+    "csml-click-types @ git+https://github.com/csml-tools/csml_click_types",
 ]
 
 [project.scripts]
